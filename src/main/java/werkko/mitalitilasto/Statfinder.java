@@ -19,12 +19,14 @@ import org.openqa.selenium.htmlunit.HtmlUnitDriver;
  * @author Lalli
  */
 class Statfinder {
+    //Joskus tilastoissa näkyy seuranpaikalla maatunnus, sillon ei lasketa pisteitä seuralle
 
     ArrayList<String> maatunnukset = new ArrayList<String>() {
         {
             add("FIN");
             add("Russia");
             add("Russia ");
+            add("Finland");
             add("USA");
             add("UKR");
             add("UZB");
@@ -36,22 +38,39 @@ class Statfinder {
             add("ROM");
             add("FRO");
             add("DEN");
-        }    
+        }
     };
     WebDriver driver = new HtmlUnitDriver();
     HashMap<String, Seura> seurat = new HashMap<String, Seura>();
+    HashMap<String, Boolean> blacklist = new HashMap<String, Boolean>();
 
-    public Statfinder() {
-       
+    public Statfinder(int vuosi, boolean pdf) {
+        createBlacklist();
         List<WebElement> linkit = etsiLinkitTuloksiin();
-        List<String> linkitStringina = vainVuosiMitalilinkit(2012, linkit);
-        linkitStringina = poistaToimimattomat(linkitStringina);
-        
+        List<String> linkitStringina = haeTietynVuodenLinkit(vuosi, linkit);
         keraaTilastot(linkitStringina);
         tulostaTilastot();
+    }
 
+    private void createBlacklist() {
+        blacklist.put("http://www.judoshiai.fi/junior_fjo_2011_res/medals.html", true);
+        blacklist.put("http://www.stockholmsjudo.se/jswop/results13/", true);
+        blacklist.put("http://www.orimattilanjudo.net/sm_Kisasivut/smjudoetusivu.htm", true);
+        blacklist.put("http://www.judoshiai.fi/SM_2011", true);
+        blacklist.put("http://www.erkkijokikokko.com/balticsea_20110126/contest_2010/tulokset.html", true);
+        blacklist.put("http://www.judoshiai.fi/kymijoki_2010_tulokset/medals.html", true);
+        blacklist.put("http://www.judoshiai.fi/Orimattila_joukkue_2010_results/index.html", true);
+        blacklist.put("http://www.judoshiai.fi/SM_2010/sovellettu.html", true);
+        blacklist.put("http://www.judoshiai.fi/JC_IV_2010_tulokset/medals.html", true);
+        blacklist.put("http://www.judoshiai.fi/JC_I_2010_tulokset", true);
+        blacklist.put("http://www.judoshiai.fi/NSM_2009_AB/medals.html", true);
+        blacklist.put("http://www.erkkijokikokko.com/JC_I_2009_VK_tulokset/", true);
+        blacklist.put("http://www.erkkijokikokko.com/jc_I_2009_OV_tulokset/", true);
+        blacklist.put("http://www.judoshiai.fi/kymijoki_U13_U15_res/medals.html", true);
+        blacklist.put("http://www.judoshiai.fi/results/2013/voru_kevad_2013/vorukevad.rei.ee/tulemused_2013/", true);
 
     }
+    //Käy läpi judoshiain tuloslistan ja tallettaa linkit elements listaan
 
     private List<WebElement> etsiLinkitTuloksiin() {
 
@@ -60,104 +79,54 @@ class Statfinder {
         return elements;
     }
 
-    private List<String> vainVuosiMitalilinkit(int i, List<WebElement> linkit) {
+    //valitsee listasta vain halutun vuoden tulokset ja palauttaa listan linkeistä
+    private List<String> haeTietynVuodenLinkit(int vuosi, List<WebElement> linkit) {
         List<String> vuodenLinkit = new ArrayList<String>();
 
         for (WebElement webElement : linkit) {
-            if (webElement.toString().contains("2012")) {
+            if (webElement.toString().contains(vuosi + "") || vuosi == 0) {
                 vuodenLinkit.add(webElement.getAttribute("href").replaceAll("index.html", "medals.html"));
             }
         }
         return vuodenLinkit;
     }
 
-    private List<String> poistaToimimattomat(List<String> linkitStringina) {
-        ArrayList<String> poistettavat = new ArrayList<String>();
-        ArrayList<String> lisattavat = new ArrayList<String>();
-        int kierros = 1;
-        for (String string : linkitStringina) {
-            System.out.println("GET (" + kierros + "/" + linkitStringina.size() + "): " + string);
-            driver.get(string);
-            if (driver.getPageSource().contains("Not Found") || string.endsWith(".pdf")) {
-                poistettavat.add(string);
-            }
-            if(string.contains("junnucup")){
-                poistettavat.add(string);
-            }
-            kierros++;
-        }
-        linkitStringina.removeAll(poistettavat);
-        for (String string : poistettavat) {
-            System.out.println("Virheellinen: "+string);
-        }
-        linkitStringina.addAll(lisattavat);
-        
-        
-        return linkitStringina;
-    }
-
+    //osa linkeistä ei toimi joten niitä ei tule käydä läpi, lisäksi junnucup kisoja ei haluta laskea mukaan
+    //käydään jokainen linkki läpi ja luodaan seuraoliot niiden perusteella
     private void keraaTilastot(List<String> linkitStringina) {
-        int kierros = 1;
         for (String string : linkitStringina) {
             if (!string.endsWith("/medals.html")) {
                 string += "/medals.html";
             }
             driver.get(string);
-            System.out.println("Analyzing (" + kierros + "/" + linkitStringina.size() + ": " + string);
-            WebElement medalTable = driver.findElement(By.className("medals"));
-
-            List<WebElement> medalRows = medalTable.findElements(By.cssSelector("td"));
-            List<String> medalRowsStringeina = Stringeiksi(medalRows);
-            for (int i = 0; i < medalRowsStringeina.size() - 1; i += 6) {
-
-                String seuranNimi = medalRowsStringeina.get(i + 2);
-                seuranNimi = tarkastaNimi(seuranNimi);
-                if (seuranNimi != null) {
-                    int kultaMitalit = Integer.parseInt(medalRowsStringeina.get(i + 3));
-                    int hopeaMitalit = Integer.parseInt(medalRowsStringeina.get(i + 4));
-                    int pronssiMitalit = Integer.parseInt(medalRowsStringeina.get(i + 5));
-
-                    if (!seurat.containsKey(seuranNimi)) {
-                        seurat.put(seuranNimi, new Seura(seuranNimi));
-                    }
-                    Seura seura = seurat.get(seuranNimi);
-                    seura.lisaaYkkossijoja(kultaMitalit);
-                    seura.lisaaKakkossijoja(hopeaMitalit);
-                    seura.lisaaKolmossijoja(pronssiMitalit);
-                    seurat.put(seuranNimi, seura);
-                }
+            if (linkkiToimii()) {
+                System.out.println("Analysoidaan: " + string);
+                WebElement medalTable = driver.findElement(By.className("medals"));  //etsitään medals taulukko ja 
+                List<WebElement> medalRows = medalTable.findElements(By.cssSelector("td")); // laitetaan sen rivit listaan
+                List<String> medalRowsStringeina = Stringeiksi(medalRows);      // jonka jälkeen muutetaan rivit stringeiksi
+                kasitteleTaulukonRivit(medalRowsStringeina);
             }
-            kierros++;
-        }
-
-
-    }
-
-    private List<String> Stringeiksi(List<WebElement> medalRows) {
-        ArrayList<String> lista = new ArrayList<String>();
-        for (WebElement webElement : medalRows) {
-            lista.add(webElement.getText());
-        }
-        return lista;
-    }
-
-    private void tulostaTilastot() {
-        ArrayList<Seura> seuralista = seuratListaan();
-        Collections.sort(seuralista);
-        int laskuri = 1;
-        for (Seura seura : seuralista) {
-            System.out.println(laskuri + ". " + seura.toString());
-            laskuri++;
         }
     }
 
-    private ArrayList<Seura> seuratListaan() {
-        ArrayList<Seura> seuralista = new ArrayList<Seura>();
-        Set<String> keys = seurat.keySet();
-        for (String string : keys) {
-            seuralista.add(seurat.get(string));
+    private void kasitteleTaulukonRivit(List<String> medalRowsStringeina) {
+        for (int i = 0; i < medalRowsStringeina.size() - 1; i += 6) {
+            String seuranNimi = medalRowsStringeina.get(i + 2);
+            seuranNimi = tarkastaNimi(seuranNimi);
+            if (seuranNimi != null) {
+                int kultaMitalit = Integer.parseInt(medalRowsStringeina.get(i + 3));
+                int hopeaMitalit = Integer.parseInt(medalRowsStringeina.get(i + 4));
+                int pronssiMitalit = Integer.parseInt(medalRowsStringeina.get(i + 5));
+                if (!seurat.containsKey(seuranNimi)) {
+                    seurat.put(seuranNimi, new Seura(seuranNimi));
+                }
+                Seura seura = seurat.get(seuranNimi);
+                seura.lisaaYkkossijoja(kultaMitalit);
+                seura.lisaaKakkossijoja(hopeaMitalit);
+                seura.lisaaKolmossijoja(pronssiMitalit);
+                seurat.put(seuranNimi, seura);
+            }
         }
-        return seuralista;
     }
 
     private String tarkastaNimi(String seuranNimi) {
@@ -177,4 +146,56 @@ class Statfinder {
         }
         return seuranNimi;
     }
+
+    private boolean linkkiToimii() {
+        if (driver.getCurrentUrl().contains("junnucup")
+                || driver.getPageSource().contains("Not Found")
+                || driver.getCurrentUrl().contains(".pdf")
+                || blacklisted(driver.getCurrentUrl())) {
+            return false;
+        }
+        return true;
+    }
+
+    private List<String> Stringeiksi(List<WebElement> medalRows) {
+        ArrayList<String> lista = new ArrayList<String>();
+        for (WebElement webElement : medalRows) {
+            lista.add(webElement.getText());
+        }
+        return lista;
+    }
+
+    private ArrayList<Seura> seuratListaan() {
+        ArrayList<Seura> seuralista = new ArrayList<Seura>();
+        Set<String> keys = seurat.keySet();
+        for (String string : keys) {
+            seuralista.add(seurat.get(string));
+        }
+        return seuralista;
+    }
+
+    private boolean medalsPageDoesntExist() {
+
+        return false;
+    }
+
+    private boolean blacklisted(String string) {
+        if (blacklist.get(string) == null) {
+
+            return false;
+        }
+        return true;
+    }
+    //sivuja jotka ei enää toimi syystä tai toisesta
+
+    private void tulostaTilastot() {
+        ArrayList<Seura> seuralista = seuratListaan();
+        Collections.sort(seuralista);
+        int laskuri = 1;
+        for (Seura seura : seuralista) {
+            System.out.println(laskuri + ". " + seura.toString());
+            laskuri++;
+        }
+    }
+    //käydään jokainen taulukon rivi läpi ja luodaan/muokataan niiden perusteella seuraolioita
 }
