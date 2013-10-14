@@ -1,9 +1,6 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package werkko.mitalitilasto;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,9 +37,29 @@ class Statfinder {
             add("DEN");
         }
     };
+    //sivuja jotka ei toimi syystä tai toisesta
+
+    private void createBlacklist() {
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/junior_fjo_2011_res/medals.html", true);
+        rikkinaisetLinkit.put("http://www.stockholmsjudo.se/jswop/results13/", true);
+        rikkinaisetLinkit.put("http://www.orimattilanjudo.net/sm_Kisasivut/smjudoetusivu.htm", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/SM_2011", true);
+        rikkinaisetLinkit.put("http://www.erkkijokikokko.com/balticsea_20110126/contest_2010/tulokset.html", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/kymijoki_2010_tulokset/medals.html", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/Orimattila_joukkue_2010_results/index.html", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/SM_2010/sovellettu.html", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/JC_IV_2010_tulokset/medals.html", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/JC_I_2010_tulokset", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/NSM_2009_AB/medals.html", true);
+        rikkinaisetLinkit.put("http://www.erkkijokikokko.com/JC_I_2009_VK_tulokset/", true);
+        rikkinaisetLinkit.put("http://www.erkkijokikokko.com/jc_I_2009_OV_tulokset/", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/kymijoki_U13_U15_res/medals.html", true);
+        rikkinaisetLinkit.put("http://www.judoshiai.fi/results/2013/voru_kevad_2013/vorukevad.rei.ee/tulemused_2013/", true);
+
+    }
     WebDriver driver = new HtmlUnitDriver();
     HashMap<String, Seura> seurat = new HashMap<String, Seura>();
-    HashMap<String, Boolean> blacklist = new HashMap<String, Boolean>();
+    HashMap<String, Boolean> rikkinaisetLinkit = new HashMap<String, Boolean>();
 
     public Statfinder(int vuosi, boolean pdf) {
         createBlacklist();
@@ -52,26 +69,7 @@ class Statfinder {
         tulostaTilastot();
     }
 
-    private void createBlacklist() {
-        blacklist.put("http://www.judoshiai.fi/junior_fjo_2011_res/medals.html", true);
-        blacklist.put("http://www.stockholmsjudo.se/jswop/results13/", true);
-        blacklist.put("http://www.orimattilanjudo.net/sm_Kisasivut/smjudoetusivu.htm", true);
-        blacklist.put("http://www.judoshiai.fi/SM_2011", true);
-        blacklist.put("http://www.erkkijokikokko.com/balticsea_20110126/contest_2010/tulokset.html", true);
-        blacklist.put("http://www.judoshiai.fi/kymijoki_2010_tulokset/medals.html", true);
-        blacklist.put("http://www.judoshiai.fi/Orimattila_joukkue_2010_results/index.html", true);
-        blacklist.put("http://www.judoshiai.fi/SM_2010/sovellettu.html", true);
-        blacklist.put("http://www.judoshiai.fi/JC_IV_2010_tulokset/medals.html", true);
-        blacklist.put("http://www.judoshiai.fi/JC_I_2010_tulokset", true);
-        blacklist.put("http://www.judoshiai.fi/NSM_2009_AB/medals.html", true);
-        blacklist.put("http://www.erkkijokikokko.com/JC_I_2009_VK_tulokset/", true);
-        blacklist.put("http://www.erkkijokikokko.com/jc_I_2009_OV_tulokset/", true);
-        blacklist.put("http://www.judoshiai.fi/kymijoki_U13_U15_res/medals.html", true);
-        blacklist.put("http://www.judoshiai.fi/results/2013/voru_kevad_2013/vorukevad.rei.ee/tulemused_2013/", true);
-
-    }
     //Käy läpi judoshiain tuloslistan ja tallettaa linkit elements listaan
-
     private List<WebElement> etsiLinkitTuloksiin() {
 
         driver.get("http://www.judoshiai.fi/results/previous_fi.php");
@@ -94,21 +92,31 @@ class Statfinder {
     //osa linkeistä ei toimi joten niitä ei tule käydä läpi, lisäksi junnucup kisoja ei haluta laskea mukaan
     //käydään jokainen linkki läpi ja luodaan seuraoliot niiden perusteella
     private void keraaTilastot(List<String> linkitStringina) {
+        double kierrokset = 1;
         for (String string : linkitStringina) {
             if (!string.endsWith("/medals.html")) {
                 string += "/medals.html";
             }
             driver.get(string);
             if (linkkiToimii()) {
-                System.out.println("Analysoidaan: " + string);
+                double prosentit = kierrokset/linkitStringina.size()*100;
+                DecimalFormat df = new DecimalFormat("#.##");
+                System.out.println("Analysoidaan ("+df.format(prosentit)+"%): " + string);
                 WebElement medalTable = driver.findElement(By.className("medals"));  //etsitään medals taulukko ja 
                 List<WebElement> medalRows = medalTable.findElements(By.cssSelector("td")); // laitetaan sen rivit listaan
                 List<String> medalRowsStringeina = Stringeiksi(medalRows);      // jonka jälkeen muutetaan rivit stringeiksi
                 kasitteleTaulukonRivit(medalRowsStringeina);
             }
+            kierrokset++;
         }
     }
 
+    //medalRowsStringeina on array jossa yhden seuran tiedot on aina 6 peräkkäisessä paikassa
+    //tärkeimmät niistä on paikat 3,4,5 ja 6
+    //3 = seuran nimi
+    //4 = kultamitalit
+    //5 = hopeat
+    //6 = pronssit
     private void kasitteleTaulukonRivit(List<String> medalRowsStringeina) {
         for (int i = 0; i < medalRowsStringeina.size() - 1; i += 6) {
             String seuranNimi = medalRowsStringeina.get(i + 2);
@@ -165,28 +173,13 @@ class Statfinder {
         return lista;
     }
 
-    private ArrayList<Seura> seuratListaan() {
-        ArrayList<Seura> seuralista = new ArrayList<Seura>();
-        Set<String> keys = seurat.keySet();
-        for (String string : keys) {
-            seuralista.add(seurat.get(string));
-        }
-        return seuralista;
-    }
-
-    private boolean medalsPageDoesntExist() {
-
-        return false;
-    }
-
     private boolean blacklisted(String string) {
-        if (blacklist.get(string) == null) {
+        if (rikkinaisetLinkit.get(string) == null) {
 
             return false;
         }
         return true;
     }
-    //sivuja jotka ei enää toimi syystä tai toisesta
 
     private void tulostaTilastot() {
         ArrayList<Seura> seuralista = seuratListaan();
@@ -197,5 +190,13 @@ class Statfinder {
             laskuri++;
         }
     }
-    //käydään jokainen taulukon rivi läpi ja luodaan/muokataan niiden perusteella seuraolioita
+
+    private ArrayList<Seura> seuratListaan() {
+        ArrayList<Seura> seuralista = new ArrayList<Seura>();
+        Set<String> keys = seurat.keySet();
+        for (String string : keys) {
+            seuralista.add(seurat.get(string));
+        }
+        return seuralista;
+    }
 }
