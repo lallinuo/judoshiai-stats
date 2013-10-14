@@ -1,1 +1,1 @@
-test
+Judoshiai stats analyzer
