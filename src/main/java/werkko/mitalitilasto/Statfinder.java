@@ -126,14 +126,14 @@ class Statfinder {
                 int kultaMitalit = Integer.parseInt(medalRowsStringeina.get(i + 3));
                 int hopeaMitalit = Integer.parseInt(medalRowsStringeina.get(i + 4));
                 int pronssiMitalit = Integer.parseInt(medalRowsStringeina.get(i + 5));
-                if (!seurat.containsKey(seuranNimi)) {
-                    seurat.put(seuranNimi, new Seura(seuranNimi));
+                if (!seurat.containsKey(seuranNimi.toUpperCase())) {
+                    seurat.put(seuranNimi.toUpperCase(), new Seura(seuranNimi));
                 }
-                Seura seura = seurat.get(seuranNimi);
+                Seura seura = seurat.get(seuranNimi.toUpperCase());
                 seura.lisaaYkkossijoja(kultaMitalit);
                 seura.lisaaKakkossijoja(hopeaMitalit);
                 seura.lisaaKolmossijoja(pronssiMitalit);
-                seurat.put(seuranNimi, seura);
+                seurat.put(seuranNimi.toUpperCase(), seura);
             }
         }
     }
