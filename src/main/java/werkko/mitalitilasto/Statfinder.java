@@ -92,8 +92,9 @@ class Statfinder {
     //osa linkeistä ei toimi joten niitä ei tule käydä läpi, lisäksi junnucup kisoja ei haluta laskea mukaan
     //käydään jokainen linkki läpi ja luodaan seuraoliot niiden perusteella
     private void keraaTilastot(List<String> linkitStringina) {
-        double kierrokset = 1;
+        double kierrokset = 0;
         for (String string : linkitStringina) {
+            kierrokset++;
             if (!string.endsWith("/medals.html")) {
                 string += "/medals.html";
             }
@@ -107,7 +108,7 @@ class Statfinder {
                 List<String> medalRowsStringeina = Stringeiksi(medalRows);      // jonka jälkeen muutetaan rivit stringeiksi
                 kasitteleTaulukonRivit(medalRowsStringeina);
             }
-            kierrokset++;
+            
         }
     }
 
